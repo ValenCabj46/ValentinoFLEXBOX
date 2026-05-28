@@ -1,0 +1,45 @@
+/* desktop.css - Reglas para pantallas mayores a 768px */
+@media (min-width: 768px) {
+    
+    /* Menú: Ocultamos hamburguesa, mostramos links horizontales */
+    .hamburguesa {
+        display: none;
+    }
+
+    .menu-desktop {
+        display: flex;
+        list-style: none;
+        gap: 1.5rem;
+    }
+
+    .menu-desktop a {
+        color: white;
+        text-decoration: none;
+        font-weight: bold;
+    }
+
+    /* Layout Principal: 2 Columnas (Noticias a la izq, Ads a la der) */
+    .contenedor-principal {
+        flex-direction: row; /* Cambia a alineación horizontal */
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .noticias {
+        flex: 3; /* Ocupa 3 partes del espacio */
+    }
+
+    .publicidad {
+        flex: 1; /* Ocupa 1 parte del espacio */
+    }
+
+    /* Noticias Secundarias: En grilla horizontal */
+    .noticias-secundarias {
+        flex-direction: row;
+        justify-content: space-between;
+    }
+
+    .noticia-secundaria {
+        flex: 1;
+    }
+}
