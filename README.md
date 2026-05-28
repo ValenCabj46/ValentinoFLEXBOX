@@ -1,10 +1,5 @@
-/* reset.css */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-body {
-    font-family: Arial, sans-serif;
-    line-height: 1.6;
-}
+# Portada de Diario Deportivo
+
+Proyecto de maquetado web responsivo utilizando HTML y CSS (Flexbox) aplicando el concepto de Mobile First.
+
+**Link para visualizar la web online:** [Pegá acá tu link de GitHub Pages]
