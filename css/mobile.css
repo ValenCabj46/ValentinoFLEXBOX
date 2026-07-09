@@ -257,3 +257,24 @@ footer {
 #modal-cerrar:hover {
     background-color: #000;
 }
+
+.modal-nota {
+    font-size: 0.8rem;
+    color: #666;
+    font-style: italic;
+}
+
+.aviso-datos-guardados {
+    background-color: #eaf3ea;
+    color: #2e7d32;
+    border: 1px solid #b7ddb9;
+    border-radius: 4px;
+    padding: 0.6rem 0.9rem;
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+}
+
+#btn-enviar:disabled {
+    background-color: #7a8ba3;
+    cursor: not-allowed;
+}

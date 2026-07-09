@@ -1,9 +1,20 @@
 // js/suscripcion.js
-// Validación del formulario de suscripción - Clase 08
+// Clase 08: validación del formulario de suscripción
+// Clase 09: envío de datos al servidor por HTTP (fetch), modal de resultado,
+//           persistencia en LocalStorage y precarga del formulario
 
 document.addEventListener('DOMContentLoaded', function () {
 
     const form = document.getElementById('form-suscripcion');
+    const botonEnviar = document.getElementById('btn-enviar');
+
+    // URL del servidor al que se envían los datos del formulario.
+    // JSONPlaceholder es una API falsa de pruebas: acepta cualquier POST
+    // y responde con el mismo cuerpo enviado + un "id" generado.
+    const API_URL = 'https://jsonplaceholder.typicode.com/posts';
+
+    // Clave usada para guardar/leer los datos en LocalStorage
+    const CLAVE_LOCALSTORAGE = 'diarioDeportivo_suscripcion';
 
     // ---------------------------------------------------
     // Funciones de validación
@@ -133,6 +144,12 @@ document.addEventListener('DOMContentLoaded', function () {
         { id: 'dni', etiqueta: 'DNI', validar: validarDNI }
     ];
 
+    // Mapa id -> etiqueta legible, usado también para mostrar
+    // la respuesta del servidor en el modal.
+    const ETIQUETAS = {};
+    campos.forEach(function (campo) { ETIQUETAS[campo.id] = campo.etiqueta; });
+    ETIQUETAS.id = 'ID de suscripción (servidor)';
+
     // Valida un campo puntual y actualiza su mensaje de error en pantalla.
     // Devuelve el mensaje de error (o null si está OK).
     function validarCampo(campo) {
@@ -169,11 +186,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // Caso especial: si el usuario corrige la contraseña principal
-    // después de haber cargado la repetición, conviene re-chequear
-    // la repetición al perder foco la contraseña (no obligatorio,
-    // pero evita confusiones). Se valida igual en su propio blur.
-
     // ---------------------------------------------------
     // Cartel emergente (modal)
     // ---------------------------------------------------
@@ -183,35 +195,49 @@ document.addEventListener('DOMContentLoaded', function () {
     const modalContenido = document.getElementById('modal-contenido');
     const botonCerrarModal = document.getElementById('modal-cerrar');
 
-    function mostrarModalExito(datos) {
+    // Modal de éxito: se llama con los datos que devolvió el SERVIDOR
+    // (no los que escribió el usuario), tal como pide la consigna.
+    function mostrarModalExito(datosRespuesta) {
         modalCaja.classList.remove('modal-error');
-        modalTitulo.textContent = '¡Suscripción exitosa!';
+        modalTitulo.textContent = '¡Suscripción enviada con éxito!';
 
-        let html = '<p>Estos son los datos que enviaste:</p><dl>';
-        html += '<div><dt>Nombre completo:</dt><dd>' + escapeHtml(datos.nombre) + '</dd></div>';
-        html += '<div><dt>Email:</dt><dd>' + escapeHtml(datos.email) + '</dd></div>';
-        html += '<div><dt>Contraseña:</dt><dd>••••••••</dd></div>';
-        html += '<div><dt>Edad:</dt><dd>' + escapeHtml(datos.edad) + '</dd></div>';
-        html += '<div><dt>Teléfono:</dt><dd>' + escapeHtml(datos.telefono) + '</dd></div>';
-        html += '<div><dt>Dirección:</dt><dd>' + escapeHtml(datos.direccion) + '</dd></div>';
-        html += '<div><dt>Ciudad:</dt><dd>' + escapeHtml(datos.ciudad) + '</dd></div>';
-        html += '<div><dt>Código Postal:</dt><dd>' + escapeHtml(datos.cp) + '</dd></div>';
-        html += '<div><dt>DNI:</dt><dd>' + escapeHtml(datos.dni) + '</dd></div>';
+        let html = '<p>El servidor confirmó la suscripción. Estos son los datos recibidos en la respuesta:</p><dl>';
+        Object.keys(datosRespuesta).forEach(function (clave) {
+            const etiqueta = ETIQUETAS[clave] || clave;
+            const esPassword = (clave === 'password' || clave === 'password2');
+            const valor = esPassword ? '••••••••' : datosRespuesta[clave];
+            html += '<div><dt>' + escapeHtml(etiqueta) + ':</dt><dd>' + escapeHtml(String(valor)) + '</dd></div>';
+        });
         html += '</dl>';
+        html += '<p class="modal-nota">Guardamos estos datos en tu navegador (LocalStorage) para precargar el formulario la próxima vez que entres.</p>';
 
         modalContenido.innerHTML = html;
         abrirModal();
     }
 
+    // Modal de error de VALIDACIÓN (antes de llamar al servidor)
     function mostrarModalErrores(errores) {
         modalCaja.classList.add('modal-error');
         modalTitulo.textContent = 'Revisá los siguientes errores';
 
-        let html = '<p>No pudimos procesar tu suscripción porque encontramos estos problemas:</p><ul>';
+        let html = '<p>No pudimos enviar tu suscripción porque encontramos estos problemas:</p><ul>';
         errores.forEach(function (err) {
             html += '<li><strong>' + escapeHtml(err.etiqueta) + ':</strong> ' + escapeHtml(err.mensaje) + '</li>';
         });
         html += '</ul>';
+
+        modalContenido.innerHTML = html;
+        abrirModal();
+    }
+
+    // Modal de error del SERVIDOR (la validación pasó, pero el HTTP falló)
+    function mostrarModalErrorEnvio(mensaje) {
+        modalCaja.classList.add('modal-error');
+        modalTitulo.textContent = 'No se pudo completar la suscripción';
+
+        let html = '<p>Tus datos son correctos, pero ocurrió un problema al enviarlos al servidor:</p>';
+        html += '<ul><li>' + escapeHtml(mensaje) + '</li></ul>';
+        html += '<p class="modal-nota">No se guardó ninguna información en tu navegador. Podés volver a intentarlo.</p>';
 
         modalContenido.innerHTML = html;
         abrirModal();
@@ -237,6 +263,93 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // ---------------------------------------------------
+    // LocalStorage
+    // ---------------------------------------------------
+    function guardarEnLocalStorage(datosRespuesta) {
+        try {
+            localStorage.setItem(CLAVE_LOCALSTORAGE, JSON.stringify(datosRespuesta));
+        } catch (error) {
+            console.error('No se pudo guardar en LocalStorage:', error);
+        }
+    }
+
+    function mostrarAvisoDatosCargados() {
+        // Evita duplicar el aviso si por algún motivo se llama dos veces
+        if (document.querySelector('.aviso-datos-guardados')) return;
+
+        const aviso = document.createElement('p');
+        aviso.className = 'aviso-datos-guardados';
+        aviso.textContent = 'Precargamos los datos de tu última suscripción exitosa.';
+        form.insertAdjacentElement('beforebegin', aviso);
+    }
+
+    // Se ejecuta en el evento "load" de window: si hay datos guardados
+    // de una suscripción exitosa anterior, precarga el formulario.
+    function cargarDatosGuardados() {
+        const guardado = localStorage.getItem(CLAVE_LOCALSTORAGE);
+        if (!guardado) return;
+
+        try {
+            const datos = JSON.parse(guardado);
+            campos.forEach(function (campo) {
+                const input = document.getElementById(campo.id);
+                if (input && datos[campo.id] !== undefined && datos[campo.id] !== null) {
+                    input.value = datos[campo.id];
+                }
+            });
+            mostrarAvisoDatosCargados();
+        } catch (error) {
+            console.error('No se pudieron leer los datos guardados de LocalStorage:', error);
+        }
+    }
+
+    // ---------------------------------------------------
+    // Envío al servidor (POST con los campos como query params)
+    // ---------------------------------------------------
+    function enviarSuscripcion(datos) {
+        const textoOriginalBoton = botonEnviar.textContent;
+
+        // Los valores del formulario van como query params en la URL...
+        const queryParams = new URLSearchParams(datos).toString();
+        const url = API_URL + '?' + queryParams;
+
+        botonEnviar.disabled = true;
+        botonEnviar.textContent = 'Enviando...';
+
+        // ...y también se mandan en el body, porque JSONPlaceholder (la API
+        // de prueba que usamos) solo refleja en su respuesta lo que recibe
+        // en el body del POST. Así garantizamos que el modal pueda mostrar
+        // los datos "recibidos como respuesta de la llamada HTTP".
+        fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(datos)
+        })
+            .then(function (respuesta) {
+                if (!respuesta.ok) {
+                    throw new Error('El servidor respondió con error ' + respuesta.status + ' (' + respuesta.statusText + ').');
+                }
+                return respuesta.json();
+            })
+            .then(function (datosRespuesta) {
+                guardarEnLocalStorage(datosRespuesta);
+                mostrarModalExito(datosRespuesta);
+
+                form.reset();
+                campos.forEach(function (campo) {
+                    document.getElementById(campo.id).classList.remove('campo-invalido');
+                });
+            })
+            .catch(function (error) {
+                mostrarModalErrorEnvio(error.message || 'No se pudo conectar con el servidor. Verificá tu conexión a internet.');
+            })
+            .finally(function () {
+                botonEnviar.disabled = false;
+                botonEnviar.textContent = textoOriginalBoton;
+            });
+    }
+
+    // ---------------------------------------------------
     // Envío del formulario
     // ---------------------------------------------------
     form.addEventListener('submit', function (evento) {
@@ -251,25 +364,22 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
-        if (errores.length === 0) {
-            const datos = {
-                nombre: document.getElementById('nombre').value.trim(),
-                email: document.getElementById('email').value.trim(),
-                edad: document.getElementById('edad').value.trim(),
-                telefono: document.getElementById('telefono').value.trim(),
-                direccion: document.getElementById('direccion').value.trim(),
-                ciudad: document.getElementById('ciudad').value.trim(),
-                cp: document.getElementById('cp').value.trim(),
-                dni: document.getElementById('dni').value.trim()
-            };
-            mostrarModalExito(datos);
-            form.reset();
-            campos.forEach(function (campo) {
-                document.getElementById(campo.id).classList.remove('campo-invalido');
-            });
-        } else {
+        if (errores.length > 0) {
             mostrarModalErrores(errores);
+            return;
         }
+
+        const datos = {};
+        campos.forEach(function (campo) {
+            datos[campo.id] = document.getElementById(campo.id).value.trim();
+        });
+
+        enviarSuscripcion(datos);
     });
+
+    // ---------------------------------------------------
+    // Precarga del formulario al recargar la página
+    // ---------------------------------------------------
+    window.addEventListener('load', cargarDatosGuardados);
 
 });
